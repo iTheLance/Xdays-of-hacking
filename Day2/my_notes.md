@@ -93,6 +93,8 @@ export TERM=xterm
 
 **[Fig 6: hostnamepython3: command not found error]**
 
+After running it correctly inside the reverse shell, the prompt changed to a full bash prompt and the TTY upgrade worked.
+
 ---
 
 ## Key Takeaways
