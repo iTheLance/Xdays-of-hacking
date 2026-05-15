@@ -129,7 +129,7 @@ What the server got back in the response body:
     "password": "supersecret",
     "username": "lance"
 },
-"origin": "102.68.70.10"
+"origin": "xxx.xx.xx.xx"
 ```
 
 Key points:
